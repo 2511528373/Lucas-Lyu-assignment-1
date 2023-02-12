@@ -1,0 +1,258 @@
+---
+title: "APM466 Assignment 1"
+output: pdf_document
+fontsize: 12pt
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("astsa")
+install.packages("jrvFinance")
+install.packages("lubridate")
+library(lubridate)
+library(jrvFinance)
+library(readxl)
+library(tidyverse) 
+library(gridExtra)
+library(datasets)
+library(dplyr)
+library("astsa")
+bond_data <- read_excel("Final Data Selection.xlsx")
+#bond_data <- read_csv("Final Data Selection.csv")
+```
+
+\newpage
+
+## Question 4a
+```{r}
+bond_maturity_date <- bond_data$`Maturity date`
+selected_dates <- c("2023-01-16", "2023-01-17", "2023-01-18", "2023-01-19", "2023-01-20", "2023-01-23", "2023-01-24", "2023-01-25", "2023-01-26", "2023-01-27")
+price_matrix <- matrix(c(bond_data$`44942`, bond_data$`44943`, bond_data$`44944`, bond_data$`44945`, bond_data$`44946`, bond_data$`44949`, bond_data$`44950`, bond_data$`44951`, bond_data$`44952`, bond_data$`44953`),nrow = 10, ncol=10, byrow=TRUE)
+coupons_rates <- as.numeric(bond_data$Coupon)
+time_to_maturity <- matrix(nrow = 10, ncol = 10, byrow = T)
+for (j in 1:10) {
+  for (i in 1:10) {
+    time_to_maturity[i,j] <- time_length(
+      interval(selected_dates[i], bond_maturity_date[j]),
+      "year")
+  }
+}
+
+matrix_ytm <- matrix('numeric', nrow = 10, ncol = 10)
+dirty_price <- matrix('numeric', nrow = 10, ncol = 10)
+
+for(j in c(1:10)){
+  close_price = price_matrix[,j]
+  for(i in c(1:10)){
+    matrix_ytm[i,j] <- bond.yield(
+      settle = selected_dates[i], mature = bond_maturity_date[j],coupon=coupons_rates[j],freq = 2, close_price[i], convention = c("30/360", "ACT/ACT", "ACT/360", "30/360E"), comp.freq = 2, redemption_value = 100)}}
+
+#converting into fraction of years
+for(i in c(1:10)){
+  for(j in c(1:10)){
+    fraction_of_years[i,j] = yearFraction(selected_dates[i], bond_maturity_date[j], freq = 2, convention = c("30/360", "ACT/ACT", "ACT/360","30/360E"))
+  }
+}
+
+year<-c(0,1,1.5,2,2.5,3,3.5,4,4.5,5)
+plot(year, matrix_ytm[1,], type = "l", main = 'Yield Curve', col = "black", xlab="Years to maturity", ylab = "YTM", lwd=0.8,ylim = c(0.028,0.0445))
+lines(year, matrix_ytm[2,], type = "l", col="red", lwd=0.8)
+lines(year, matrix_ytm[3,], type = "l", col="#DAA520", lwd=0.8)
+lines(year, matrix_ytm[4,], type = "l", col="#00FF00", lwd=0.8)
+lines(year, matrix_ytm[5,], type = "l", col="#FF69B4", lwd=0.8)
+lines(year, matrix_ytm[6,], type = "l", col="#CAE1FF", lwd=0.8)
+lines(year, matrix_ytm[7,], type = "l", col="#9ACD32", lwd=0.8)
+lines(year, matrix_ytm[8,], type = "l", col="#CD8500", lwd=0.8)
+lines(year, matrix_ytm[9,], type = "l", col="#FFDEAD", lwd=0.8)
+lines(year, matrix_ytm[10,], type = "l", col="#912CEE", lwd=0.8)
+
+legend("topright",lty = 1,legend=c("2023-01-16", "2023-01-17", "2023-01-18", "2023-01-19", "2023-01-20", "2023-01-23", "2023-01-24", "2023-01-25", "2023-01-26", "2023-01-27"),
+       col=c("black","red","#DAA520","#00FF00","#FF69B4","#CAE1FF","#9ACD32","#CD8500","#FFDEAD","#912CEE"),lwd=0.8,cex=0.7, bty = "n")
+
+
+```
+
+Linear interpolation
+```{r}
+# estimating YTM using linear interpolation
+years <- c(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5)
+ytm_interpolation <- matrix(nrow=10, ncol=10, byrow = T)
+for (i in 1:10) {
+  for (j in 1:9) {
+    est_rate = as.numeric(matrix_ytm[i,j])+((as.numeric(matrix_ytm[i,j+1])-as.numeric(matrix_ytm[i,j]))/(time_to_maturity[i,(j+1)]-time_to_maturity[i,j]))*(years[j]-time_to_maturity[i,j])
+    ytm_interpolation[i,j]=est_rate
+  }
+}
+ytm_interpolation[,10] <- matrix_ytm[,10]
+
+year<-c(0,1,1.5,2,2.5,3,3.5,4,4.5,5)
+plot(year, ytm_interpolation[1,], type = "l", main = 'Yield Curve with Linear interpolation', col = "black", xlab="Years to maturity", ylab = "YTM", lwd=0.8, ylim = c(0.028,0.047))
+lines(year, ytm_interpolation[2,], type = "l", col="red", lwd=0.8)
+lines(year, ytm_interpolation[3,], type = "l", col="#DAA520", lwd=0.8)
+lines(year, ytm_interpolation[4,], type = "l", col="#00FF00", lwd=0.8)
+lines(year, ytm_interpolation[5,], type = "l", col="#FF69B4", lwd=0.8)
+lines(year, ytm_interpolation[6,], type = "l", col="#CAE1FF", lwd=0.8)
+lines(year, ytm_interpolation[7,], type = "l", col="#9ACD32", lwd=0.8)
+lines(year, ytm_interpolation[8,], type = "l", col="#CD8500", lwd=0.8)
+lines(year, ytm_interpolation[9,], type = "l", col="#FFDEAD", lwd=0.8)
+lines(year, ytm_interpolation[10,], type = "l", col="#912CEE", lwd=0.8)
+
+legend("topright",lty = 1,legend=c("2023-01-16", "2023-01-17", "2023-01-18", "2023-01-19", "2023-01-20", "2023-01-23", "2023-01-24", "2023-01-25", "2023-01-26", "2023-01-27"),
+       col=c("black","red","#DAA520","#00FF00","#FF69B4","#CAE1FF","#9ACD32","#CD8500","#FFDEAD","#912CEE"),lwd=0.8,cex=0.7, bty = "n")
+
+```
+
+
+\newpage
+## Question 4b
+```{r}
+
+#convert to dirty price
+for(i in c(1:10)){
+  for (j in c(1:10)){dirty_price[i,j] <- bond.TCF (settle = selected_dates[i], mature=bond_maturity_date[j], coupon=coupons_rates[j], freq=2, convention = c("30/360", "ACT/ACT", "ACT/360", "30/360E"),
+  redemption_value = 100)$accrued + price_matrix[i,j]
+  }
+}
+
+cash_flow <- list()
+spot_rate_matrix <- matrix(nrow = 10, ncol =10)
+
+#Calculate spot rate
+for (i in c(1:10)) {
+  cash_flow <- bond.TCF (settle = selected_dates[i], mature=bond_maturity_date[i], coupon=coupons_rates[i], freq=2, convention = c("30/360", "ACT/ACT", "ACT/360", "30/360E"),
+  redemption_value = 100)$cf
+  assign(paste0("cash_flow_bond_",i), cash_flow)
+}
+
+for (i in c(1:10)){
+  A1 <- as.numeric(fraction_of_years[i,1])
+  spot_rate_1 = log(cash_flow_bond_1[1]/as.numeric(dirty_price[i,1]))/as.numeric(fraction_of_years[i,1])
+  C1 <- spot_rate_1
+  
+  A2 <- as.numeric(fraction_of_years[i,2])
+  spot_rate_2 = log(cash_flow_bond_2[1]/as.numeric(dirty_price[i,2]))/as.numeric(fraction_of_years[i,2])
+  C2 <- spot_rate_2
+  
+  A3 <- as.numeric(fraction_of_years[i,3])
+  B3 <- function(x){as.numeric(dirty_price[i,3]) - cash_flow_bond_3[1]*exp(-C1*A1)- cash_flow_bond_3[2]*exp(-C2*A2) - cash_flow_bond_3[3]*exp(-x*A3)}
+  C3 <- uniroot(B3,c(-1,10))$root
+  
+  A4 <- as.numeric(fraction_of_years[i,4])
+  B4 <- function(x){as.numeric(dirty_price[i,4]) - cash_flow_bond_4[1]*exp(-C1*A1)- cash_flow_bond_4[2]*exp(-C2*A2) - cash_flow_bond_4[3]*exp(-C3*A3) - cash_flow_bond_4[4]*exp(-x*A4)}
+  C4 <- uniroot(B4,c(-1,10))$root
+  
+  A5 <- as.numeric(fraction_of_years[i,5])
+  B5 <- function(x){as.numeric(dirty_price[i,5])- cash_flow_bond_5[1]*exp(-C1*A1) - cash_flow_bond_5[2]*exp(-C2*A2)- cash_flow_bond_5[3]*exp(-C3*A3) - cash_flow_bond_5[4]*exp(-C4*A4) - cash_flow_bond_5[5]*exp(-x*A5)}
+  C5 <- uniroot(B5,c(-1,10))$root
+  
+  A6 <- as.numeric(fraction_of_years[i,6])
+  B6 <- function(x){as.numeric(dirty_price[i,6])- cash_flow_bond_6[1]*exp(-C1*A1)- cash_flow_bond_6[2]*exp(-C2*A2) - cash_flow_bond_6[3]*exp(-C3*A3)- cash_flow_bond_6[4]*exp(-C4*A4) - cash_flow_bond_6[5]*exp(-C5*A5) - cash_flow_bond_6[6]*exp(-x*A6)}
+  C6 <- uniroot(B6,c(-1,10))$root
+  
+  A7 <- as.numeric(fraction_of_years[i,7])
+  B7 <- function(x){as.numeric(dirty_price[i,7])- cash_flow_bond_7[1]*exp(-C1*A1) - cash_flow_bond_7[2]*exp(-C2*A2)- cash_flow_bond_7[3]*exp(-C3*A3) - cash_flow_bond_7[4]*exp(-C4*A4)- cash_flow_bond_7[5]*exp(-C5*A5) - cash_flow_bond_7[6]*exp(-C6*A6) - cash_flow_bond_7[7]*exp(-x*A7)}
+  C7 <- uniroot(B7,c(-1,10))$root
+  
+  A8 <- as.numeric(fraction_of_years[i,8])
+  B8 <- function(x){as.numeric(dirty_price[i,8])- cash_flow_bond_8[1]*exp(-C1*A1) - cash_flow_bond_8[2]*exp(-C2*A2) - cash_flow_bond_8[3]*exp(-C3*A3)- cash_flow_bond_8[4]*exp(-C4*A4) - cash_flow_bond_8[5]*exp(-C5*A5)- cash_flow_bond_8[6]*exp(-C6*A6) - cash_flow_bond_8[7]*exp(-C7*A7) - cash_flow_bond_8[8]*exp(-x*A8)}
+  C8 <- uniroot(B8,c(-1,10))$root
+  
+  A9 <- as.numeric(fraction_of_years[i,9])
+  B9 <- function(x){as.numeric(dirty_price[i,9])- cash_flow_bond_9[1]*exp(-C1*A1) - cash_flow_bond_9[2]*exp(-C2*A2) - cash_flow_bond_9[3]*exp(-C3*A3) - cash_flow_bond_9[4]*exp(-C4*A4)- cash_flow_bond_9[5]*exp(-C5*A5) - cash_flow_bond_9[6]*exp(-C6*A6)- cash_flow_bond_9[7]*exp(-C7*A7) - cash_flow_bond_9[8]*exp(-C8*A8) - cash_flow_bond_9[9]*exp(-x*A9)}
+  C9 <- uniroot(B9,c(-1,10))$root
+  
+  A10 <- as.numeric(fraction_of_years[i,10])
+  B10 <- function(x){as.numeric(dirty_price[i,10])- cash_flow_bond_10[1]*exp(-C1*A1)- cash_flow_bond_10[2]*exp(-C2*A2) - cash_flow_bond_10[3]*exp(-C3*A3) - cash_flow_bond_10[4]*exp(-C4*A4) - cash_flow_bond_10[5]*exp(-C5*A5)- cash_flow_bond_10[6]*exp(-C6*A6) - cash_flow_bond_10[7]*exp(-C7*A7)- cash_flow_bond_10[8]*exp(-C8*A8) - cash_flow_bond_10[9]*exp(-C9*A9) - cash_flow_bond_10[10]*exp(-x*A10)}
+  C10 <- uniroot(B10,c(-1,10))$root
+  
+  Spot= rbind(C1, C2, C3, C4, C5, C6, C7, C8, C9, C10)
+
+spot_rate_matrix[i,] <- Spot
+}
+
+#Plot graph
+year<-c(0,1,1.5,2,2.5,3,3.5,4,4.5,5)
+plot(year, spot_rate_matrix[1, ], type = "l", main = '5 Years Spot Curve', col = "black", xlab="Years to maturity", ylab = "Spot Rate", lwd=0.8,ylim = c(0.028,0.0445))
+lines(year, spot_rate_matrix[2,], type = "l", col="red", lwd=0.8)
+lines(year, spot_rate_matrix[3,], type = "l", col="#DAA520", lwd=0.8)
+lines(year, spot_rate_matrix[4,], type = "l", col="#00FF00", lwd=0.8)
+lines(year, spot_rate_matrix[5,], type = "l", col="#FF69B4", lwd=0.8)
+lines(year, spot_rate_matrix[6,], type = "l", col="#CAE1FF", lwd=0.8)
+lines(year, spot_rate_matrix[7,], type = "l", col="#9ACD32", lwd=0.8)
+lines(year, spot_rate_matrix[8,], type = "l", col="#CD8500", lwd=0.8)
+lines(year, spot_rate_matrix[9,], type = "l", col="#FFDEAD", lwd=0.8)
+lines(year, spot_rate_matrix[10,], type = "l", col="#912CEE", lwd=0.8)
+
+legend("topright",lty = 1,legend=c("2023-01-16", "2023-01-17", "2023-01-18", "2023-01-19", "2023-01-20", "2023-01-23", "2023-01-24", "2023-01-25", "2023-01-26", "2023-01-27"),
+       col=c("black","red","#DAA520","#00FF00","#FF69B4","#CAE1FF","#9ACD32","#CD8500","#FFDEAD","#912CEE"),lwd=0.8,cex=0.7, bty = "n")
+
+```
+\newpage
+## Question 4c
+```{r}
+forward_rate_matrix = matrix(nrow = 10, ncol = 4)
+
+for(j in c(1:10)){
+  for(i in c(1:4)){
+    forward_rate_matrix[j,i] <- uniroot(function(x) ((1+spot_rate_matrix[j,1]/2)^2)*((1+x/2)^(2*i)) - (1+spot_rate_matrix[j,i+1]/2)^(2*(i+1)),c(0,10))$root
+  }
+}
+
+year <- c(1,2,3,4)
+plot(year, forward_rate_matrix[1, ], type = "l", main = 'Forward curve', col = "black", xlab="Time from 1yr", ylab = "Foward Rate", lwd=0.8, ylim=c(0.032,0.049))
+lines(year, forward_rate_matrix[2,], type = "l", col="red", lwd=0.8)
+lines(year, forward_rate_matrix[3,], type = "l", col="#DAA520", lwd=0.8)
+lines(year, forward_rate_matrix[4,], type = "l", col="#00FF00", lwd=0.8)
+lines(year, forward_rate_matrix[5,], type = "l", col="#FF69B4", lwd=0.8)
+lines(year, forward_rate_matrix[6,], type = "l", col="#CAE1FF", lwd=0.8)
+lines(year, forward_rate_matrix[7,], type = "l", col="#9ACD32", lwd=0.8)
+lines(year, forward_rate_matrix[8,], type = "l", col="#CD8500", lwd=0.8)
+lines(year, forward_rate_matrix[9,], type = "l", col="#FFDEAD", lwd=0.8)
+lines(year, forward_rate_matrix[10,], type = "l", col="#912CEE", lwd=0.8)
+
+legend("topright",lty = 1,legend=c("2023-01-16", "2023-01-17", "2023-01-18", "2023-01-19", "2023-01-20", "2023-01-23", "2023-01-24", "2023-01-25", "2023-01-26", "2023-01-27"),
+       col=c("black","red","#DAA520","#00FF00","#FF69B4","#CAE1FF","#9ACD32","#CD8500","#FFDEAD","#912CEE"),lwd=0.8,cex=0.7, bty = "n")
+
+```
+
+
+\newpage
+## Question 5
+
+```{r}
+log_ytm<-matrix(nrow=9,ncol=5)
+for(i in c(1:9)){
+  for(j in c(1:5)){
+    log_ytm[i,j]<-log(as.numeric(ytm_interpolation[(i+1),j])/as.numeric(ytm_interpolation[i,j]))
+  }
+}
+cov_ytm <- cov(log_ytm)
+cov_ytm
+
+log_forward <- matrix(nrow=9, ncol=4)
+for (i in 1:9) {
+  for (j in 1:4) {
+    log_forward[i,j] <- log(forward_rate_matrix[i+1, j]/forward_rate_matrix[i,j])
+  }
+}
+
+cov_foward <- cov(log_forward)
+cov_foward
+```
+
+\newpage
+## Question 6
+
+```{r}
+print(eigen(cov_ytm)$values)
+print(eigen(cov_ytm)$vectors)
+
+print(eigen(cov_foward)$values)
+print(eigen(cov_foward)$vectors)
+
+```
+
+
+
+
